@@ -1,0 +1,19 @@
+-- ====================================================================
+-- OPTIONAL SEED DATA FOR LOCAL / STAGING TESTING
+-- Note: Replace UUIDs with real user IDs from auth.users if testing with real accounts.
+-- ====================================================================
+
+-- Sample commentary:
+-- Once you have created 1 caregiver and 1 elderly user via the application interface
+-- or Supabase Auth UI, you can link them by running:
+--
+-- INSERT INTO public.caregiver_links (caregiver_id, elderly_id, relationship, status)
+-- VALUES ('<CAREGIVER_UUID>', '<ELDERLY_UUID>', 'Daughter', 'active');
+--
+-- Sample Daily Routine:
+-- INSERT INTO public.daily_plans (elderly_id, title, description, activity_type, scheduled_time, plan_date)
+-- VALUES ('<ELDERLY_UUID>', 'Morning Bihu Song Recollection', 'Listen to peaceful classical Assamese melody', 'cultural_music', '09:00:00', CURRENT_DATE);
+--
+-- Sample Memory Item:
+-- INSERT INTO public.memory_items (elderly_id, title, description, item_type, cultural_tag, familiarity_rating)
+-- VALUES ('<ELDERLY_UUID>', 'Majuli Island Boat Ride', 'Our 1982 family journey across the Brahmaputra', 'place', 'Majuli Island', 5);

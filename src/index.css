@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-scale: 1;
+  }
+
+  html.text-size-normal {
+    font-size: 16px;
+  }
+
+  html.text-size-large {
+    font-size: 19px;
+  }
+
+  html.text-size-xlarge {
+    font-size: 22px;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    color: #1e293b;
+    background-color: #f8fafc;
+    min-height: 100vh;
+  }
+
+  /* High contrast mode for elderly patients */
+  html.high-contrast-mode {
+    filter: contrast(1.15);
+  }
+
+  html.high-contrast-mode body {
+    background-color: #fcfbf9;
+  }
+
+  html.high-contrast-mode button {
+    border-width: 2px !important;
+  }
+}
+
+/* Touch targets and accessibility improvements */
+.touch-target {
+  min-height: 52px;
+  min-width: 52px;
+}
+
+/* Gentle pulse for key buttons without causing visual distress */
+@keyframes gentle-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.animate-gentle {
+  animation: gentle-pulse 3s infinite ease-in-out;
+}
