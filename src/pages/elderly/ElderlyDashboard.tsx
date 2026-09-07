@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+
 import { DailyPlan } from '../../types/database';
 import { CognitiveGameId, CognitiveJourneyStats } from '../../types/games';
 import { SimpleMood, PersonalizedDailyPlan } from '../../types/plan';
@@ -42,6 +43,9 @@ import {
 
 export const ElderlyDashboard: React.FC = () => {
   const { user, profile } = useAuth();
+
+const navigate = useNavigate();
+
   const handleCopyPatientCode = async () => {
   if (!profile?.patient_code) return;
 
@@ -52,7 +56,7 @@ export const ElderlyDashboard: React.FC = () => {
     console.warn('Could not copy patient code');
   }
 };
-  const navigate = useNavigate();
+  
 
   const [currentTime, setCurrentTime] = useState(new Date());
 interface MemoryItem {
@@ -489,6 +493,12 @@ const displayName = profile?.preferred_name || profile?.full_name || 'Friend';
             </div>
           </div>
 {/* 5. MY MEMORIES */}
+<button
+  onClick={() => navigate('/elderly/smriti-practice')}
+  className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-bold text-white"
+>
+  🧠 Start Smriti Practice
+</button>
 <section className="bg-white rounded-3xl p-5 sm:p-6 border border-amber-200 shadow-md">
   <div className="flex items-center justify-between mb-5">
     <div>

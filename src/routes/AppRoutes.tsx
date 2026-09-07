@@ -8,7 +8,8 @@ import { ElderlyDashboard } from '../pages/elderly/ElderlyDashboard';
 import { GamePlayerPage } from '../pages/elderly/GamePlayerPage';
 import { CaregiverDashboard } from '../pages/caregiver/CaregiverDashboard';
 import { Unauthorized } from '../pages/unauthorized/Unauthorized';
-
+import SmritiPracticePage from '../pages/elderly/SmritiPracticePage';   
+console.log('SmritiPracticePage imported'); // Debugging line
 // Smart Home redirector based on authenticated role
 const HomeRedirect: React.FC = () => {
   const { user, role, loading, isConfigured } = useAuth();
@@ -42,6 +43,7 @@ export const AppRoutes: React.FC = () => {
       <Route element={<ProtectedRoute requiredRole="elderly" />}>
         <Route path="/elderly" element={<ElderlyDashboard />} />
         <Route path="/elderly/play/:gameId" element={<GamePlayerPage />} />
+        <Route path="/elderly/smriti-practice" element={<SmritiPracticePage />} />
       </Route>
 
       {/* Protected Caregiver Routes */}
