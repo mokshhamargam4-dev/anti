@@ -158,22 +158,14 @@ export const RememberObjectsGame: React.FC<RememberObjectsGameProps> = ({
         </div>
 
         {/* Difficulty Selector */}
-        <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-          {(['easy', 'medium', 'hard'] as GameDifficulty[]).map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => onDifficultyChange(level)}
-              className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold capitalize transition-colors ${
-                difficulty === level
-                  ? 'bg-teal-700 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {level}
-            </button>
-          ))}
-        </div>
+      <div className="px-4 py-2 rounded-2xl bg-teal-50 border border-teal-200 text-center">
+  <span className="text-xs text-teal-700 font-bold uppercase tracking-wider">
+    Adaptive Level
+  </span>
+  <div className="text-sm font-extrabold text-teal-900 capitalize">
+    {difficulty}
+  </div>
+</div>
       </div>
 
       {/* PHASE 1: MEMORIZE */}

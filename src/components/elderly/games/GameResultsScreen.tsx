@@ -113,7 +113,7 @@ export const GameResultsScreen: React.FC<GameResultsScreenProps> = ({
         {result.adaptiveReason && (
           <div className="bg-amber-50/70 border border-amber-200/60 px-4 py-2 rounded-xl text-xs text-amber-900 font-medium flex items-center justify-center space-x-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Adaptive Insight: {result.adaptiveReason}</span>
+            <span>Personalized for you: {result.adaptiveReason}</span>
           </div>
         )}
       </div>

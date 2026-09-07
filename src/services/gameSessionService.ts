@@ -56,7 +56,11 @@ export const saveGameSession = async (
 /**
  * Fetches game history from Supabase if authenticated, otherwise returns LocalStorage sessions.
  */
-export const fetchUserGameHistory = async (userId: string | undefined): Promise<GameResult[]> => {
+ export const fetchUserGameHistory = async (
+  userId: string | undefined
+): Promise<GameResult[]> => {
+  // For a real logged-in user, Supabase is the source of truth.
+  // Do NOT fall back to shared/demo LocalStorage data.
   if (isSupabaseConfigured() && userId) {
     try {
       const { data, error } = await supabase
@@ -66,32 +70,60 @@ export const fetchUserGameHistory = async (userId: string | undefined): Promise<
         .order('completed_at', { ascending: false })
         .limit(50);
 
-      if (!error && data && data.length > 0) {
-        // Map database records to GameResult
-        const mapped: GameResult[] = data.map((row: any) => ({
-          gameId: row.game_type as CognitiveGameId,
-          gameTitle: getGameTitle(row.game_type),
-          difficulty: row.difficulty_level,
-          score: row.score,
-          maxScore: row.max_score || 100,
-          accuracy: Number(row.accuracy_rate) || 0,
-          durationSeconds: row.duration_seconds || 0,
-          reactionTimeMs: row.metrics?.reaction_time_ms,
-          attempts: row.metrics?.attempts || 1,
-          completedAt: row.completed_at || row.created_at,
-          encouragingFeedback: getEncouragingMessage(Number(row.accuracy_rate) || 0, row.difficulty_level),
-          adaptiveReason: row.metrics?.adaptive_reason,
-        }));
+      if (error) {
+        console.warn(
+          'Could not query Supabase game history:',
+          error.message
+        );
 
-        // Sync to local storage
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
-        return mapped;
+        // If Supabase is configured but the database request fails,
+        // return an empty history rather than showing another patient's data.
+        return [];
       }
+
+      const mapped: GameResult[] = (data ?? []).map((row: any) => ({
+        gameId: row.game_type as CognitiveGameId,
+        gameTitle: getGameTitle(row.game_type),
+        difficulty: row.difficulty_level,
+        score: row.score,
+        maxScore: row.max_score || 100,
+        accuracy: Number(row.accuracy_rate) || 0,
+        durationSeconds: row.duration_seconds || 0,
+        reactionTimeMs: row.metrics?.reaction_time_ms,
+        attempts: row.metrics?.attempts || 1,
+        completedAt: row.completed_at || row.created_at,
+        encouragingFeedback: getEncouragingMessage(
+          Number(row.accuracy_rate) || 0,
+          row.difficulty_level
+        ),
+        adaptiveReason: row.metrics?.adaptive_reason,
+      }));
+
+      // Cache only this patient's actual Supabase history.
+      try {
+        localStorage.setItem(
+          `${LOCAL_STORAGE_KEY}_${userId}`,
+          JSON.stringify(mapped)
+        );
+      } catch (cacheError) {
+        console.warn('Could not cache game history:', cacheError);
+      }
+
+      // IMPORTANT:
+      // If this patient has no database sessions, return [].
+      // Do not return demo sessions.
+      return mapped;
     } catch (err) {
-      console.warn('Could not query Supabase, falling back to local history:', err);
+      console.warn(
+        'Supabase network error fetching game history:',
+        err
+      );
+
+      return [];
     }
   }
 
+  // Local/demo mode is only used when Supabase is not configured.
   return getLocalSessions();
 };
 
@@ -113,10 +145,10 @@ export const calculateCognitiveJourney = (sessions: GameResult[]): CognitiveJour
   const avgAccuracy =
     total > 0
       ? Math.round(sessions.reduce((acc, curr) => acc + curr.accuracy, 0) / total)
-      : 85;
+      : 0;
 
   const currentStreak = calculateConsecutiveStreak(sessions);
-  const bestStreak = Math.max(currentStreak, parseInt(localStorage.getItem(STREAK_KEY) || '4', 10));
+  const bestStreak = Math.max(currentStreak, parseInt(localStorage.getItem(STREAK_KEY) || '0', 10));
 
   // Compute 7-day weekly activity map (Past 7 days up to today)
   const weeklyActivity: WeeklyActivityDay[] = [];
@@ -157,7 +189,7 @@ export const calculateCognitiveJourney = (sessions: GameResult[]): CognitiveJour
 };
 
 const calculateConsecutiveStreak = (sessions: GameResult[]): number => {
-  if (sessions.length === 0) return 1;
+  if (sessions.length === 0) return 0;
 
   const uniqueDays = Array.from(
     new Set(sessions.map(s => s.completedAt.split('T')[0]))

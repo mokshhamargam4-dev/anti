@@ -7,6 +7,7 @@ import { CognitiveGameId, CognitiveJourneyStats } from '../../types/games';
 import { SimpleMood, PersonalizedDailyPlan } from '../../types/plan';
 import { fetchUserGameHistory, calculateCognitiveJourney } from '../../services/gameSessionService';
 import { NON_MEDICAL_DISCLAIMER } from '../../services/adaptiveDifficulty';
+import { getTranslations } from '../../services/languageService';
 import {
   generatePersonalizedPlan,
   saveMoodCheckin,
@@ -35,20 +36,44 @@ import {
   Calendar,
   Activity,
   Check,
+  Copy,
   Lightbulb
 } from 'lucide-react';
 
 export const ElderlyDashboard: React.FC = () => {
   const { user, profile } = useAuth();
+  const handleCopyPatientCode = async () => {
+  if (!profile?.patient_code) return;
+
+  try {
+    await navigator.clipboard.writeText(profile.patient_code);
+    alert('Patient code copied!');
+  } catch {
+    console.warn('Could not copy patient code');
+  }
+};
   const navigate = useNavigate();
 
   const [currentTime, setCurrentTime] = useState(new Date());
+interface MemoryItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  item_type: string;
+  cultural_tag?: string | null;
+}
+
+const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [selectedMood, setSelectedMood] = useState<SimpleMood | null>(null);
   const [moodSubmitted, setMoodSubmitted] = useState<boolean>(false);
   const [dailyPlans, setDailyPlans] = useState<DailyPlan[]>([]);
   const [journey, setJourney] = useState<CognitiveJourneyStats | null>(null);
   const [personalizedPlan, setPersonalizedPlan] = useState<PersonalizedDailyPlan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  if (!user?.id) {
+  setLoading(false);
+  return;
+}
 
   // Time & orientation ticker
   useEffect(() => {
@@ -62,7 +87,16 @@ export const ElderlyDashboard: React.FC = () => {
       setLoading(true);
 
       // 1. Fetch live game sessions
-      const sessions = await fetchUserGameHistory(user?.id);
+      const sessions = await fetchUserGameHistory(user.id);
+      const { data: memoryData, error: memoryError } = await supabase
+  .from('memory_items')
+  .select('*')
+  .eq('elderly_id', user.id)
+  .order('created_at', { ascending: false });
+
+if (!memoryError) {
+  setMemories(memoryData || []);
+}
       const computedJourney = calculateCognitiveJourney(sessions);
       setJourney(computedJourney);
 
@@ -81,54 +115,27 @@ export const ElderlyDashboard: React.FC = () => {
 
       // 4. Fetch daily care routine plans
       if (user?.id) {
-        const { data: plans } = await supabase
-          .from('daily_plans')
-          .select('*')
-          .eq('elderly_id', user.id)
-          .order('scheduled_time', { ascending: true });
-
+        const today = new Date();
+const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+console.log('Elderly user ID:', user.id);
+console.log('Today:', todayStr);
+     const { data: plans,error: plansError } = await supabase
+  .from('daily_plans')
+  .select('*')
+  .eq('elderly_id', user.id)
+  .eq('plan_date', todayStr)
+  .order('scheduled_time', { ascending: true });
+if (plansError) {
+  alert(`Daily plans error: ${plansError.message}`);
+  console.error('Daily plans error:', plansError);
+}
         if (plans && plans.length > 0) {
-          setDailyPlans(plans as DailyPlan[]);
-        } else {
-          setDailyPlans([
-            {
-              id: 'demo-1',
-              elderly_id: user.id,
-              title: 'Morning Brahmaputra Tea & Sunshine',
-              description: 'Sit in the veranda, drink warm tea, and breathe fresh morning air',
-              scheduled_time: '08:00',
-              activity_type: 'routine',
-              is_completed: true,
-              plan_date: new Date().toISOString().split('T')[0],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            {
-              id: 'demo-2',
-              elderly_id: user.id,
-              title: 'Cognitive Memory Recall Exercise',
-              description: 'Play recommended morning personalized activity',
-              scheduled_time: '11:00',
-              activity_type: 'cognitive_game',
-              is_completed: false,
-              plan_date: new Date().toISOString().split('T')[0],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            {
-              id: 'demo-3',
-              elderly_id: user.id,
-              title: 'Afternoon Memory Vitamin',
-              description: 'Take memory vitamin with a fresh glass of water',
-              scheduled_time: '14:00',
-              activity_type: 'medication',
-              is_completed: false,
-              plan_date: new Date().toISOString().split('T')[0],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ]);
-        }
+  console.log('Daily care plans received:', plans);
+  setDailyPlans(plans as DailyPlan[]);
+} else {
+  console.log('No daily care plans found');
+  setDailyPlans([]);
+}
       }
 
       setLoading(false);
@@ -153,17 +160,67 @@ export const ElderlyDashboard: React.FC = () => {
     await syncPersonalizedPlan(user?.id, recalibratedPlan);
   };
 
-  const toggleTask = (planId: string) => {
-    setDailyPlans(prev =>
-      prev.map(p => (p.id === planId ? { ...p, is_completed: !p.is_completed } : p))
+  const toggleTask = async (planId: string) => {
+  const task = dailyPlans.find((plan) => plan.id === planId);
+
+  if (!task || !user?.id) return;
+
+  const newCompletedState = !task.is_completed;
+  const completedAt = newCompletedState
+    ? new Date().toISOString()
+    : null;
+
+  // Update screen immediately
+  setDailyPlans((prev) =>
+    prev.map((plan) =>
+      plan.id === planId
+        ? {
+            ...plan,
+            is_completed: newCompletedState,
+            completed_at: completedAt,
+          }
+        : plan
+    )
+  );
+
+  // Save completion to Supabase
+  const { error } = await supabase
+    .from('daily_plans')
+    .update({
+      is_completed: newCompletedState,
+      completed_at: completedAt,
+    })
+    .eq('id', planId)
+    .eq('elderly_id', user.id);
+
+  if (error) {
+    console.error('Could not update care task:', error);
+
+    // Revert screen if database update failed
+    setDailyPlans((prev) =>
+      prev.map((plan) =>
+        plan.id === planId
+          ? {
+              ...plan,
+              is_completed: task.is_completed,
+              completed_at: task.completed_at,
+            }
+          : plan
+      )
     );
-  };
+
+    alert('Could not save the task. Please try again.');
+  }
+};
 
   const launchActivity = (gameId: CognitiveGameId) => {
     navigate(`/elderly/play/${gameId}`);
   };
 
-  const displayName = profile?.preferred_name || profile?.full_name || 'Friend';
+ const language = profile?.primary_language || 'English';
+const t = getTranslations(language);
+
+const displayName = profile?.preferred_name || profile?.full_name || 'Friend';
   const timeString = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateString = currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -179,10 +236,10 @@ export const ElderlyDashboard: React.FC = () => {
               North Eastern Region • {profile?.region || 'Assam'}
             </div>
             <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
-              Namaskar, {displayName}!
+              {t.greeting}, {displayName}!
             </h1>
             <p className="mt-2 text-teal-100 text-lg sm:text-xl font-medium">
-              We are so glad to see you today. Here is your personalized cognitive plan for a calm and active mind.
+              {t.welcome}
             </p>
           </div>
 
@@ -190,7 +247,7 @@ export const ElderlyDashboard: React.FC = () => {
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-white/20 text-center flex-shrink-0">
             <div className="flex items-center justify-center space-x-2 text-amber-300 mb-1">
               <Clock className="w-6 h-6" />
-              <span className="text-xs uppercase font-bold tracking-wider">Current Time</span>
+              <span className="text-xs uppercase font-bold tracking-wider">{t.currentTime}</span>
             </div>
             <div className="text-3xl sm:text-4xl font-extrabold">{timeString}</div>
             <div className="text-xs sm:text-sm text-teal-100 mt-1 font-medium">{dateString}</div>
@@ -206,12 +263,43 @@ export const ElderlyDashboard: React.FC = () => {
               <Smile className="w-7 h-7" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">How are you feeling right now?</h2>
-              <p className="text-slate-500 text-sm">Touch a card below; your daily practice plan adapts to your comfort.</p>
+              <h2 className="text-2xl font-bold text-slate-800">{t.feeling}</h2>
+              <p className="text-slate-500 text-sm">{t.feelingHelp}</p>
             </div>
           </div>
-          <span className="text-xs font-semibold text-slate-400 hidden sm:inline">Non-medical comfort check</span>
+          <span className="text-xs font-semibold text-slate-400 hidden sm:inline">non-mediical comfort check</span>
         </div>
+        <section className="bg-white rounded-3xl p-5 sm:p-6 border border-teal-200 shadow-md">
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wider text-teal-700">
+        Your Caregiver Code
+      </p>
+      <h2 className="text-xl font-extrabold text-slate-800 mt-1">
+        Share this code with your caregiver
+      </h2>
+      <p className="text-sm text-slate-500 mt-1">
+        Your caregiver can use this code to connect to your progress.
+      </p>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <div className="px-4 py-3 rounded-xl bg-slate-100 border border-slate-200 font-black tracking-wider text-lg text-slate-800">
+        {profile?.patient_code || 'Generating...'}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleCopyPatientCode}
+        disabled={!profile?.patient_code}
+        className="p-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+        title="Copy caregiver code"
+      >
+        <Copy className="w-5 h-5" />
+      </button>
+    </div>
+  </div>
+</section>
 
         {/* The 3 Clear Options: Good, Okay, Not good */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
@@ -228,7 +316,7 @@ export const ElderlyDashboard: React.FC = () => {
           >
             <span className="text-4xl sm:text-5xl select-none">{MOOD_DEFINITIONS.good.emoji}</span>
             <div>
-              <span className="block font-black text-slate-800 text-lg sm:text-xl">Good</span>
+              <span className="block font-black text-slate-800 text-lg sm:text-xl">{t.good}</span>
               <span className="block text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
                 {MOOD_DEFINITIONS.good.description}
               </span>
@@ -247,7 +335,7 @@ export const ElderlyDashboard: React.FC = () => {
           >
             <span className="text-4xl sm:text-5xl select-none">{MOOD_DEFINITIONS.okay.emoji}</span>
             <div>
-              <span className="block font-black text-slate-800 text-lg sm:text-xl">Okay</span>
+              <span className="block font-black text-slate-800 text-lg sm:text-xl">{t.okay}</span>
               <span className="block text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
                 {MOOD_DEFINITIONS.okay.description}
               </span>
@@ -266,7 +354,7 @@ export const ElderlyDashboard: React.FC = () => {
           >
             <span className="text-4xl sm:text-5xl select-none">{MOOD_DEFINITIONS.not_good.emoji}</span>
             <div>
-              <span className="block font-black text-slate-800 text-lg sm:text-xl">Not good</span>
+              <span className="block font-black text-slate-800 text-lg sm:text-xl">{t.notGood}</span>
               <span className="block text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
                 {MOOD_DEFINITIONS.not_good.description}
               </span>
@@ -279,7 +367,7 @@ export const ElderlyDashboard: React.FC = () => {
           <div className="mt-4 p-3.5 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 flex items-center space-x-3 text-xs sm:text-sm font-semibold">
             <Heart className="w-5 h-5 text-rose-500 fill-rose-500 flex-shrink-0" />
             <span>
-              Thank you for checking in! Your plan below has been calibrated to your comfort and shared with your caregiver.
+              {t.thankYou}
             </span>
           </div>
         )}
@@ -301,7 +389,7 @@ export const ElderlyDashboard: React.FC = () => {
                 <span>Deterministic Personalized Plan</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Today's Recommended Activities
+                {t.recommendedActivities}
               </h2>
               <p className="text-teal-200 text-sm mt-1">
                 {personalizedPlan.overallGoal}
@@ -367,7 +455,7 @@ export const ElderlyDashboard: React.FC = () => {
                       className="w-full py-3.5 px-4 rounded-2xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold text-base shadow-lg transition-all active:scale-95 flex items-center justify-center space-x-2 touch-target"
                     >
                       <Play className="w-5 h-5 fill-slate-950" />
-                      <span>Start Activity ({activity.estimatedMinutes} min)</span>
+                      <span>{t.startActivity} ({activity.estimatedMinutes} min)</span>
                     </button>
                   )}
                 </div>
@@ -390,7 +478,7 @@ export const ElderlyDashboard: React.FC = () => {
                 <Activity className="w-7 h-7" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-800">My Cognitive Journey</h2>
+                <h2 className="text-2xl font-bold text-slate-800">{t.cognitiveJourney}</h2>
                 <p className="text-slate-500 text-sm">Your weekly habit, engagement milestones & adaptive progress</p>
               </div>
             </div>
@@ -400,14 +488,70 @@ export const ElderlyDashboard: React.FC = () => {
               <span>Live Database Records</span>
             </div>
           </div>
+{/* 5. MY MEMORIES */}
+<section className="bg-white rounded-3xl p-5 sm:p-6 border border-amber-200 shadow-md">
+  <div className="flex items-center justify-between mb-5">
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+        My Memories
+      </p>
+      <h2 className="text-xl font-extrabold text-slate-800 mt-1">
+        Special Moments & Familiar Things
+      </h2>
+      <p className="text-sm text-slate-500 mt-1">
+        Revisit people, places, songs and cultural memories saved for you.
+      </p>
+    </div>
+    <div className="text-3xl">🧠</div>
+  </div>
 
+  {memories.length === 0 ? (
+    <div className="text-center py-8 rounded-2xl bg-amber-50 border border-amber-100">
+      <p className="text-sm font-semibold text-slate-700">
+        No memories have been added yet.
+      </p>
+      <p className="text-xs text-slate-500 mt-1">
+        Your caregiver can add meaningful memories for you.
+      </p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {memories.map((memory) => (
+        <div
+          key={memory.id}
+          className="p-4 rounded-2xl bg-amber-50 border border-amber-100"
+        >
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+            {memory.item_type?.replace('_', ' ')}
+          </p>
+
+          <h3 className="text-lg font-bold text-slate-800 mt-1">
+            {memory.title}
+          </h3>
+
+          {memory.description && (
+            <p className="text-sm text-slate-600 mt-2">
+              {memory.description}
+            </p>
+          )}
+
+          {memory.cultural_tag && (
+            <span className="inline-block mt-3 px-2.5 py-1 rounded-full bg-white text-xs font-semibold text-amber-700 border border-amber-200">
+              {memory.cultural_tag}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+</section>
           {/* Key Metric Highlights */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Current Streak */}
             <div className="p-4 rounded-2xl bg-orange-50/70 border border-orange-200">
               <div className="flex items-center justify-between text-orange-800 text-xs font-bold uppercase tracking-wider mb-1">
-                <span>Streak</span>
+                <span>{t.streak}</span>
                 <Flame className="w-4 h-4 text-orange-600" />
               </div>
               <div className="text-3xl font-black text-slate-800">
@@ -421,7 +565,7 @@ export const ElderlyDashboard: React.FC = () => {
             {/* Total Games Completed */}
             <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200">
               <div className="flex items-center justify-between text-teal-800 text-xs font-bold uppercase tracking-wider mb-1">
-                <span>Activities</span>
+                <span>{t.activities}</span>
                 <Award className="w-4 h-4 text-teal-600" />
               </div>
               <div className="text-3xl font-black text-slate-800">
@@ -434,7 +578,7 @@ export const ElderlyDashboard: React.FC = () => {
 
             {/* Average Accuracy */}
             <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-              <div className="flex items-center justify-between text-emerald-800 text-xs font-bold uppercase tracking-wider mb-1">
+              <div className="flex items-center justify-between text-emerald-800 text-xs ont-bold uppercase tracking-wider mb-1">
                 <span>Average Accuracy</span>
                 <Target className="w-4 h-4 text-emerald-600" />
               </div>
@@ -449,7 +593,7 @@ export const ElderlyDashboard: React.FC = () => {
             {/* Weekly Target */}
             <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200">
               <div className="flex items-center justify-between text-blue-800 text-xs font-bold uppercase tracking-wider mb-1">
-                <span>Weekly Goal</span>
+                <span>{t.weeklyGoal}</span>
                 <Calendar className="w-4 h-4 text-blue-600" />
               </div>
               <div className="text-3xl font-black text-slate-800">
@@ -507,6 +651,19 @@ export const ElderlyDashboard: React.FC = () => {
 
           {/* Recent Performance History List */}
           <div>
+            <div className="mb-4 p-4 rounded-2xl bg-purple-50 border border-purple-100">
+  <div className="flex items-center justify-between">
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wider text-purple-700">
+        Cognitive Progress
+      </p>
+      <p className="text-sm font-semibold text-purple-900 mt-1">
+        Your recent performance is tracked to personalize future activities.
+      </p>
+    </div>
+    <Activity className="w-6 h-6 text-purple-600" />
+  </div>
+</div>
             <div className="flex items-center space-x-2 text-slate-700 font-bold text-base mb-3">
               <History className="w-5 h-5 text-purple-600" />
               <span>Recent Performance History</span>
@@ -524,17 +681,22 @@ export const ElderlyDashboard: React.FC = () => {
                         {session.gameTitle}
                       </span>
                       <span className="text-xs font-bold px-2 py-0.5 rounded-full capitalize bg-teal-100 text-teal-800">
-                        {session.difficulty}
+                        {session.difficulty} level
                       </span>
                     </div>
                     <div className="text-2xl font-black text-slate-800">
                       {session.score} <span className="text-xs font-semibold text-slate-500">pts</span>
                     </div>
                     {session.adaptiveReason && (
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
-                        {session.adaptiveReason}
-                      </p>
-                    )}
+  <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-100">
+    <p className="text-[10px] font-bold text-amber-700 mb-0.5">
+      Personalized adjustment
+    </p>
+    <p className="text-[11px] text-amber-900">
+      {session.adaptiveReason}
+    </p>
+  </div>
+)}
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex items-center justify-between text-xs font-bold">
@@ -568,7 +730,7 @@ export const ElderlyDashboard: React.FC = () => {
             <CalendarCheck className="w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Today's Gentle Routine</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{t.gentleRoutine}</h2>
             <p className="text-slate-500 text-sm">Small, comforting daily care activities planned for you</p>
           </div>
         </div>
@@ -625,7 +787,7 @@ export const ElderlyDashboard: React.FC = () => {
             <PhoneCall className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-lg font-bold text-slate-800">Need Help or Want to Talk?</h4>
+            <h4 className="text-lg font-bold text-slate-800">{t.needHelp}</h4>
             <p className="text-sm text-slate-500">
               Your registered emergency contact & family caregiver can be reached with one tap.
             </p>
@@ -638,7 +800,7 @@ export const ElderlyDashboard: React.FC = () => {
           className="px-6 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-base shadow-md flex items-center transition active:scale-95 flex-shrink-0"
         >
           <PhoneCall className="w-5 h-5 mr-2" />
-          Reach Caregiver Now
+          {t.reachCaregiver}
         </button>
       </section>
 

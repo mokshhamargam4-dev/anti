@@ -3,7 +3,8 @@ import { GameDifficulty, GameResult, CulturalItem } from '../../../types/games';
 import { CULTURAL_OBJECTS } from '../../../data/culturalObjects';
 import { getEncouragingMessage } from '../../../services/gameSessionService';
 import { Sparkles, Clock, RotateCcw, Award, CheckCircle2, ChevronLeft } from 'lucide-react';
-
+import {getTranslations} from '../../../services/languageService';
+import {useAuth} from '../../../context/AuthContext';
 interface MemoryMatchGameProps {
   difficulty: GameDifficulty;
   onDifficultyChange: (diff: GameDifficulty) => void;
@@ -30,6 +31,9 @@ export const MemoryMatchGame: React.FC<MemoryMatchGameProps> = ({
   onComplete,
   onBack,
 }) => {
+  const {profile} = useAuth();
+  const language = profile?.primary_language || 'English';
+  const t = getTranslations(language);  
   const [cards, setCards] = useState<CardState[]>([]);
   const [flippedIndices, setFlippedIndices] = useState<number[]>([]);
   const [attempts, setAttempts] = useState<number>(0);
@@ -185,45 +189,37 @@ export const MemoryMatchGame: React.FC<MemoryMatchGameProps> = ({
             type="button"
             onClick={onBack}
             className="p-2.5 rounded-2xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition shadow-sm touch-target"
-            title="Return to activities"
+            title={t.back}
             aria-label="Back"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800">
-              Memory Match
+              {t.memoryMatch}
             </h2>
             <p className="text-sm text-slate-500 font-medium">
-              Find and match the matching North Eastern cultural cards
+              {t.memoryMatchHelp}
             </p>
           </div>
         </div>
 
         {/* Difficulty Selector */}
-        <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-          {(['easy', 'medium', 'hard'] as GameDifficulty[]).map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => onDifficultyChange(level)}
-              className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold capitalize transition-colors ${
-                difficulty === level
-                  ? 'bg-teal-700 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {level}
-            </button>
-          ))}
-        </div>
+        <div className="px-4 py-2 rounded-2xl bg-teal-50 border border-teal-200 text-center">
+  <span className="text-xs text-teal-700 font-bold uppercase tracking-wider">
+    Adaptive Level
+  </span>
+  <div className="text-sm font-extrabold text-teal-900 capitalize">
+    {difficulty}
+  </div>
+</div>
       </div>
 
       {/* 2. In-Game Friendly Progress Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-around text-center">
         <div className="flex items-center space-x-2 text-slate-700">
           <Clock className="w-5 h-5 text-teal-700" />
-          <span className="text-xs uppercase font-bold text-slate-500">Time:</span>
+          <span className="text-xs uppercase font-bold text-slate-500">{t.time}:</span>
           <span className="text-lg font-extrabold">{formatTimer(elapsedSeconds)}</span>
         </div>
 
@@ -231,7 +227,7 @@ export const MemoryMatchGame: React.FC<MemoryMatchGameProps> = ({
 
         <div className="flex items-center space-x-2 text-slate-700">
           <RotateCcw className="w-5 h-5 text-amber-700" />
-          <span className="text-xs uppercase font-bold text-slate-500">Attempts:</span>
+          <span className="text-xs uppercase font-bold text-slate-500">{t.attempts}:</span>
           <span className="text-lg font-extrabold">{attempts}</span>
         </div>
 
@@ -239,7 +235,7 @@ export const MemoryMatchGame: React.FC<MemoryMatchGameProps> = ({
 
         <div className="flex items-center space-x-2 text-slate-700">
           <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-          <span className="text-xs uppercase font-bold text-slate-500">Matched:</span>
+          <span className="text-xs uppercase font-bold text-slate-500">{t.matched}:</span>
           <span className="text-lg font-extrabold text-emerald-800">
             {matchedPairs} / {pairs}
           </span>
@@ -257,7 +253,7 @@ export const MemoryMatchGame: React.FC<MemoryMatchGameProps> = ({
               type="button"
               onClick={() => handleCardClick(index)}
               disabled={isLocked || card.isMatched}
-              aria-label={isOpen ? card.item.name : `Hidden Card ${index + 1}`}
+              aria-label={isOpen ? card.item.name : `${t.hiddenCard}  ${index + 1}`}
               className={`min-h-[110px] sm:min-h-[140px] p-3 rounded-3xl border-2 flex flex-col items-center justify-center transition-all duration-300 transform active:scale-95 touch-target ${
                 card.isMatched
                   ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-sm opacity-90'

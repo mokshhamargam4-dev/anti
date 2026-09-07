@@ -77,10 +77,10 @@ export const GamePlayerPage: React.FC = () => {
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-teal-800">
-                    Adaptive Calibration
+                    Personalised difficulty for you
                   </span>
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full capitalize bg-teal-100 text-teal-900">
-                    {difficulty} Level
+                    YOUR {difficulty} Level
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
@@ -108,30 +108,31 @@ export const GamePlayerPage: React.FC = () => {
         ) : (
           <>
             {activeGameId === 'memory-match' && (
-              <MemoryMatchGame
-                difficulty={difficulty}
-                onDifficultyChange={setDifficulty}
-                onComplete={handleGameComplete}
-                onBack={handleBackHome}
-              />
+            <MemoryMatchGame
+  difficulty={difficulty}
+  onDifficultyChange={() => {}}
+  onComplete={handleGameComplete}
+  onBack={handleBackHome}
+/>
             )}
 
             {activeGameId === 'remember-objects' && (
-              <RememberObjectsGame
-                difficulty={difficulty}
-                onDifficultyChange={setDifficulty}
-                onComplete={handleGameComplete}
-                onBack={handleBackHome}
-              />
+            <RememberObjectsGame
+  difficulty={difficulty}
+  onDifficultyChange={() => {}}
+  onComplete={handleGameComplete}
+  onBack={handleBackHome}
+/>
             )}
 
             {activeGameId === 'sequence-memory' && (
               <SequenceMemoryGame
-                difficulty={difficulty}
-                onDifficultyChange={setDifficulty}
-                onComplete={handleGameComplete}
-                onBack={handleBackHome}
-              />
+  difficulty={difficulty}
+  onDifficultyChange={() => {}}
+  onComplete={handleGameComplete}
+  onBack={handleBackHome}
+/>
+
             )}
           </>
         )}

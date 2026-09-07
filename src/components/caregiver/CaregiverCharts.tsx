@@ -97,7 +97,7 @@ export const AccuracyTrendChart: React.FC<AccuracyTrendChartProps> = ({ data }) 
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
             <XAxis dataKey="sessionNumber" stroke="#94A3B8" fontSize={12} tickFormatter={(val) => `S${val}`} />
-            <YAxis domain={[40, 100]} stroke="#94A3B8" fontSize={12} />
+            <YAxis domain={[0,100]} stroke="#94A3B8" fontSize={12} />
             <Tooltip
               contentStyle={{
                 backgroundColor: '#FFFFFF',

@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { DailyPlan } from '../../types/database';
 import {
   fetchLinkedPatients,
   fetchPatientFullAnalytics,
+  linkPatientByCode,
   LinkedPatientInfo,
-  PatientAnalyticsSummary
+  PatientAnalyticsSummary,
+  addDailyCarePlan
 } from '../../services/caregiverService';
+import { supabase } from '../../lib/supabase';
 import { WeeklyActivityChart, AccuracyTrendChart, GamePerformanceChart } from '../../components/caregiver/CaregiverCharts';
 import { CaregiverAlertsBanner } from '../../components/caregiver/CaregiverAlertsBanner';
 import {
@@ -27,14 +31,35 @@ import {
   History
 } from 'lucide-react';
 
+
 export const CaregiverDashboard: React.FC = () => {
   const { user, profile } = useAuth();
+ 
 
   const [linkedPatients, setLinkedPatients] = useState<LinkedPatientInfo[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<PatientAnalyticsSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+const [taskTitle, setTaskTitle] = useState('');
+const [taskDescription, setTaskDescription] = useState('');
+const [taskTime, setTaskTime] = useState('');
+const [taskType, setTaskType] =
+  useState<DailyPlan['activity_type']>('routine');
+const [taskSaving, setTaskSaving] = useState(false);
+const [taskMessage, setTaskMessage] = useState('');
+  const [patientCode, setPatientCode] = useState('');
+  const [relationship, setRelationship] = useState('Family');
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [linkSuccess, setLinkSuccess] = useState('');
+  const [memoryTitle, setMemoryTitle] = useState('');
+const [memoryDescription, setMemoryDescription] = useState('');
+const [memoryType, setMemoryType] = useState('event');
+const [memoryTag, setMemoryTag] = useState('');
+const [memorySaving, setMemorySaving] = useState(false);
+const [memorySuccess, setMemorySuccess] = useState('');
+const [memoryError, setMemoryError] = useState('');
 
   // 1. Fetch linked elderly patients from Supabase
   const loadPatients = async () => {
@@ -71,14 +96,145 @@ export const CaregiverDashboard: React.FC = () => {
       await loadAnalytics(target.elderly);
     }
   };
+const handleLinkPatient = async () => {
+  setLinkError('');
+  setLinkSuccess('');
 
+  if (!patientCode.trim()) {
+    setLinkError('Please enter the patient code.');
+    return;
+  }
+
+  setLinking(true);
+
+  const result = await linkPatientByCode(
+    patientCode.trim(),
+    relationship
+  );
+
+  if (!result.success) {
+    setLinkError(result.error || 'Could not link patient.');
+    setLinking(false);
+    return;
+  }
+
+  setLinkSuccess('Patient linked successfully!');
+  setPatientCode('');
+
+  // Reload linked patients
+  const patients = await fetchLinkedPatients(user?.id);
+  setLinkedPatients(patients);
+
+  if (result.patientId) {
+    setSelectedPatientId(result.patientId);
+
+    const linkedPatient = patients.find(
+      p => p.elderly.id === result.patientId
+    );
+
+    if (linkedPatient) {
+      await loadAnalytics(linkedPatient.elderly);
+    }
+  }
+
+  setLinking(false);
+};
+const handleAddMemory = async () => {
+  setMemoryError('');
+  setMemorySuccess('');
+
+  if (!selectedPatientId) {
+    setMemoryError('Please select a patient first.');
+    return;
+  }
+
+  if (!memoryTitle.trim()) {
+    setMemoryError('Please enter a memory title.');
+    return;
+  }
+
+  setMemorySaving(true);
+
+  const { error } = await supabase
+    .from('memory_items')
+    .insert({
+      elderly_id: selectedPatientId,
+      title: memoryTitle.trim(),
+      description: memoryDescription.trim() || null,
+      item_type: memoryType,
+      cultural_tag: memoryTag.trim() || null,
+      created_by: user?.id || null,
+    });
+
+  if (error) {
+    setMemoryError(error.message);
+  } else {
+    setMemorySuccess('Memory added successfully!');
+    setMemoryTitle('');
+    setMemoryDescription('');
+    setMemoryTag('');
+  }
+
+  setMemorySaving(false);
+};
   const handleRefresh = async () => {
     const current = linkedPatients.find(p => p.elderly.id === selectedPatientId);
     if (current) {
       await loadAnalytics(current.elderly);
     }
   };
+const handleAddCareTask = async () => {
+  if (!selectedPatientId || !user?.id) {
+    setTaskMessage('Please select a patient first.');
+    return;
+  }
 
+  if (!taskTitle.trim()) {
+    setTaskMessage('Please enter a task title.');
+    return;
+  }
+
+  setTaskSaving(true);
+  setTaskMessage('');
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(
+    today.getMonth() + 1
+  ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const result = await addDailyCarePlan(
+    selectedPatient.elderly.id,
+    user.id,
+    taskTitle,
+    taskDescription,
+    todayStr,
+    taskTime,
+    taskType
+  );
+
+  if (!result.success) {
+    setTaskMessage(result.error || 'Could not add care task.');
+    setTaskSaving(false);
+    return;
+  }
+
+  setTaskTitle('');
+  setTaskDescription('');
+  setTaskTime('');
+  setTaskType('routine');
+  setTaskMessage('Care task added successfully!');
+
+  // Refresh caregiver dashboard so the new task appears
+  const selectedPatient = linkedPatients.find(
+  (patient) => patient.elderly.id === selectedPatientId
+);
+
+if (selectedPatient) {
+  await loadAnalytics(selectedPatient.elderly);
+}
+
+  setTaskSaving(false);
+};
   const activePatientInfo = linkedPatients.find(p => p.elderly.id === selectedPatientId);
 
   return (
@@ -136,7 +292,138 @@ export const CaregiverDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+{/* Link Patient */}
+<section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+  <div className="flex items-center gap-2 mb-4">
+    <Users className="w-5 h-5 text-blue-700" />
+    <div>
+      <h2 className="font-bold text-slate-800">Link a Patient</h2>
+      <p className="text-xs text-slate-500">
+        Enter the patient's unique SmritiSetu code.
+      </p>
+    </div>
+  </div>
 
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <input
+      type="text"
+      value={patientCode}
+      onChange={(e) => setPatientCode(e.target.value)}
+      placeholder="Patient Code e.g. SS-A1B2C3"
+      className="px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+
+    <select
+      value={relationship}
+      onChange={(e) => setRelationship(e.target.value)}
+      className="px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="Family">Family</option>
+      <option value="Mother">Mother</option>
+      <option value="Father">Father</option>
+      <option value="Spouse">Spouse</option>
+      <option value="Son">Son</option>
+      <option value="Daughter">Daughter</option>
+      <option value="Guardian">Guardian</option>
+      <option value="Clinical Caregiver">Clinical Caregiver</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <button
+      type="button"
+      onClick={handleLinkPatient}
+      disabled={linking}
+      className="px-5 py-3 rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800 transition disabled:opacity-50"
+    >
+      {linking ? 'Linking...' : 'Link Patient'}
+    </button>
+  </div>
+
+  {linkError && (
+    <p className="mt-3 text-sm font-semibold text-red-600">
+      {linkError}
+    </p>
+  )}
+
+  {linkSuccess && (
+    <p className="mt-3 text-sm font-semibold text-emerald-600">
+      {linkSuccess}
+    </p>
+  )}
+</section>
+{/* Add Memory */}
+{activePatientInfo && (
+  <section className="bg-white p-6 rounded-3xl border border-amber-200 shadow-sm">
+    <div className="flex items-center gap-2 mb-4">
+      <Brain className="w-5 h-5 text-amber-700" />
+      <div>
+        <h2 className="font-bold text-slate-800">Add a Memory</h2>
+        <p className="text-xs text-slate-500">
+          Save a meaningful memory for {activePatientInfo.elderly.full_name}.
+        </p>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <input
+        type="text"
+        value={memoryTitle}
+        onChange={(e) => setMemoryTitle(e.target.value)}
+        placeholder="Memory title"
+        className="px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+      />
+
+      <select
+        value={memoryType}
+        onChange={(e) => setMemoryType(e.target.value)}
+        className="px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+      >
+        <option value="person">Person</option>
+        <option value="place">Place</option>
+        <option value="event">Event</option>
+        <option value="song_rhyme">Song / Rhyme</option>
+        <option value="cultural_artifact">Cultural Artifact</option>
+      </select>
+
+      <textarea
+        value={memoryDescription}
+        onChange={(e) => setMemoryDescription(e.target.value)}
+        placeholder="Describe this memory..."
+        rows={3}
+        className="px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 md:col-span-2"
+      />
+
+      <input
+        type="text"
+        value={memoryTag}
+        onChange={(e) => setMemoryTag(e.target.value)}
+        placeholder="Cultural tag (optional)"
+        className="px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+      />
+
+      <button
+        type="button"
+        onClick={handleAddMemory}
+        disabled={memorySaving}
+        className="px-5 py-3 rounded-xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition disabled:opacity-50"
+      >
+        {memorySaving ? 'Saving...' : 'Save Memory'}
+      </button>
+    </div>
+
+    {memoryError && (
+      <p className="mt-3 text-sm font-semibold text-red-600">
+        {memoryError}
+      </p>
+    )}
+
+    {memorySuccess && (
+      <p className="mt-3 text-sm font-semibold text-emerald-600">
+        {memorySuccess}
+      </p>
+    )}
+  </section>
+)}
       {/* 2. Immediate Overview: Patient Profile Hero Card */}
       {activePatientInfo && (
         <section className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -219,9 +506,9 @@ export const CaregiverDashboard: React.FC = () => {
               <div className="text-2xl sm:text-3xl font-black text-slate-800 mt-1">
                 {analytics.averageAccuracy}%
               </div>
-              <span className="text-xs text-emerald-600 font-bold flex items-center mt-1.5">
-                <TrendingUp className="w-3.5 h-3.5 mr-1" /> Stable recall rate
-              </span>
+              <span className="text-xs text-slate-500 font-bold flex items-center mt-1.5">
+  Based on completed games
+</span>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center">
               <Target className="w-6 h-6" />
@@ -310,7 +597,105 @@ export const CaregiverDashboard: React.FC = () => {
           <div className="lg:col-span-2">
             <GamePerformanceChart data={analytics.gamePerformance} />
           </div>
+{/* Add Daily Care Task */}
+<div className="bg-white p-6 rounded-3xl border border-teal-200 shadow-sm mb-6">
+  <div className="flex items-center space-x-2 mb-4">
+    <Calendar className="w-5 h-5 text-teal-700" />
+    <div>
+      <h3 className="text-lg font-bold text-slate-800">
+        Add Care Task
+      </h3>
+      <p className="text-sm text-slate-500">
+        Create a task for today's care routine.
+      </p>
+    </div>
+  </div>
 
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    {/* Task title */}
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1">
+        Task
+      </label>
+      <input
+        type="text"
+        value={taskTitle}
+        onChange={(e) => setTaskTitle(e.target.value)}
+        placeholder="Example: Morning walk"
+        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+      />
+    </div>
+
+    {/* Time */}
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1">
+        Time
+      </label>
+      <input
+        type="time"
+        value={taskTime}
+        onChange={(e) => setTaskTime(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+      />
+    </div>
+
+    {/* Description */}
+    <div className="md:col-span-2">
+      <label className="block text-sm font-semibold text-slate-700 mb-1">
+        Description
+      </label>
+      <input
+        type="text"
+        value={taskDescription}
+        onChange={(e) => setTaskDescription(e.target.value)}
+        placeholder="Example: Take a gentle 15 minute walk"
+        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+      />
+    </div>
+
+    {/* Activity type */}
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1">
+        Activity Type
+      </label>
+      <select
+        value={taskType}
+        onChange={(e) =>
+          setTaskType(e.target.value as DailyPlan['activity_type'])
+        }
+        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+      >
+        <option value="routine">Routine</option>
+        <option value="medication">Medication</option>
+        <option value="walk">Walk</option>
+        <option value="meal">Meal</option>
+        <option value="family_call">Family Call</option>
+        <option value="cultural_music">Cultural Music</option>
+        <option value="cognitive_game">Cognitive Game</option>
+      </select>
+    </div>
+
+    {/* Add button */}
+    <div className="flex items-end">
+      <button
+        type="button"
+        disabled={taskSaving || !selectedPatientId}
+        onClick={handleAddCareTask}
+        className="w-full px-5 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {taskSaving ? 'Adding...' : '+ Add Care Task'}
+      </button>
+    </div>
+
+  </div>
+
+  {taskMessage && (
+    <div className="mt-4 p-3 rounded-xl bg-teal-50 border border-teal-200 text-sm font-semibold text-teal-800">
+      {taskMessage}
+    </div>
+  )}
+</div>
           {/* Daily Care Routine Progress */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
@@ -352,7 +737,117 @@ export const CaregiverDashboard: React.FC = () => {
           </div>
         </section>
       )}
+<div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+  <div className="flex items-center space-x-2 mb-4">
+    <Calendar className="w-5 h-5 text-blue-700" />
+    <div>
+      <h3 className="text-lg font-bold text-slate-800">
+        Add Care Routine Task
+      </h3>
+      <p className="text-xs text-slate-500">
+        Add a task for {activePatientInfo?.elderly.preferred_name ||
+          activePatientInfo?.elderly.full_name ||
+          'the patient'}.
+      </p>
+    </div>
+  </div>
 
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <input
+      value={taskTitle}
+      onChange={(e) => setTaskTitle(e.target.value)}
+      placeholder="Task title"
+      className="w-full px-4 py-3 rounded-xl border border-slate-200"
+    />
+
+    <input
+      type="time"
+      value={taskTime}
+      onChange={(e) => setTaskTime(e.target.value)}
+      className="w-full px-4 py-3 rounded-xl border border-slate-200"
+    />
+
+    <textarea
+      value={taskDescription}
+      onChange={(e) => setTaskDescription(e.target.value)}
+      placeholder="Description (optional)"
+      className="w-full px-4 py-3 rounded-xl border border-slate-200 md:col-span-2"
+      rows={2}
+    />
+
+    <select
+      value={taskType}
+      onChange={(e) =>
+        setTaskType(
+          e.target.value as DailyPlan['activity_type']
+        )
+      }
+      className="w-full px-4 py-3 rounded-xl border border-slate-200"
+    >
+      <option value="routine">Routine</option>
+      <option value="cognitive_game">Cognitive Game</option>
+      <option value="walk">Walk</option>
+      <option value="meal">Meal</option>
+      <option value="family_call">Family Call</option>
+      <option value="cultural_music">Cultural Music</option>
+      <option value="medication">Medication</option>
+    </select>
+
+    <button
+      type="button"
+      disabled={taskSaving || !selectedPatientId}
+      onClick={async () => {
+        if (!selectedPatientId || !user?.id) return;
+
+        setTaskSaving(true);
+        setTaskMessage('');
+
+        const today = new Date();
+        const planDate =
+          `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const result = await addDailyCarePlan(
+          selectedPatientId,
+          user.id,
+          taskTitle,
+          taskDescription,
+          planDate,
+          taskTime,
+          taskType
+        );
+
+        if (result.success) {
+          setTaskTitle('');
+          setTaskDescription('');
+          setTaskTime('');
+          setTaskType('routine');
+          setTaskMessage('Task added successfully.');
+
+          const current = linkedPatients.find(
+            (p) => p.elderly.id === selectedPatientId
+          );
+
+          if (current) {
+            await loadAnalytics(current.elderly);
+          }
+        } else {
+          setTaskMessage(result.error || 'Could not add task.');
+        }
+
+        setTaskSaving(false);
+      }}
+      className="px-5 py-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold disabled:opacity-50"
+    >
+      {taskSaving ? 'Adding...' : 'Add Task'}
+    </button>
+  </div>
+
+  {taskMessage && (
+    <p className="mt-3 text-sm font-semibold text-slate-600">
+      {taskMessage}
+    </p>
+  )}
+</div>
       {/* 8. Recent Game Performance Audit Table */}
       {analytics && (
         <section className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">

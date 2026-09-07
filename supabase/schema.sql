@@ -1,10 +1,3 @@
--- ====================================================================
--- SMRITISETU (COGNINER) - SIH PS 26003 DATABASE FOUNDATION
--- AI-Based Cognitive Gaming & Memory Assistance Platform for Elderly
--- Dementia Patients in the North Eastern Region (NER)
--- ====================================================================
-
--- 1. Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
