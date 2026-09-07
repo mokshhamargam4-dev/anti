@@ -59,72 +59,46 @@ export const saveGameSession = async (
  export const fetchUserGameHistory = async (
   userId: string | undefined
 ): Promise<GameResult[]> => {
-  // For a real logged-in user, Supabase is the source of truth.
-  // Do NOT fall back to shared/demo LocalStorage data.
-  if (isSupabaseConfigured() && userId) {
-    try {
-      const { data, error } = await supabase
-        .from('game_sessions')
-        .select('*')
-        .eq('elderly_id', userId)
-        .order('completed_at', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.warn(
-          'Could not query Supabase game history:',
-          error.message
-        );
-
-        // If Supabase is configured but the database request fails,
-        // return an empty history rather than showing another patient's data.
-        return [];
-      }
-
-      const mapped: GameResult[] = (data ?? []).map((row: any) => ({
-        gameId: row.game_type as CognitiveGameId,
-        gameTitle: getGameTitle(row.game_type),
-        difficulty: row.difficulty_level,
-        score: row.score,
-        maxScore: row.max_score || 100,
-        accuracy: Number(row.accuracy_rate) || 0,
-        durationSeconds: row.duration_seconds || 0,
-        reactionTimeMs: row.metrics?.reaction_time_ms,
-        attempts: row.metrics?.attempts || 1,
-        completedAt: row.completed_at || row.created_at,
-        encouragingFeedback: getEncouragingMessage(
-          Number(row.accuracy_rate) || 0,
-          row.difficulty_level
-        ),
-        adaptiveReason: row.metrics?.adaptive_reason,
-      }));
-
-      // Cache only this patient's actual Supabase history.
-      try {
-        localStorage.setItem(
-          `${LOCAL_STORAGE_KEY}_${userId}`,
-          JSON.stringify(mapped)
-        );
-      } catch (cacheError) {
-        console.warn('Could not cache game history:', cacheError);
-      }
-
-      // IMPORTANT:
-      // If this patient has no database sessions, return [].
-      // Do not return demo sessions.
-      return mapped;
-    } catch (err) {
-      console.warn(
-        'Supabase network error fetching game history:',
-        err
-      );
-
-      return [];
-    }
+  if (!isSupabaseConfigured() || !userId) {
+    return [];
   }
 
-  // Local/demo mode is only used when Supabase is not configured.
-  return getLocalSessions();
+  try {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('*')
+      .eq('elderly_id', userId)
+      .order('completed_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Could not query Supabase game history:', error);
+      return [];
+    }
+
+    const mapped: GameResult[] = (data ?? []).map((row: any) => ({
+      gameId: row.game_type as CognitiveGameId,
+      gameTitle: getGameTitle(row.game_type),
+      difficulty: row.difficulty_level,
+      score: Number(row.score) || 0,
+      maxScore: Number(row.max_score) || 100,
+      accuracy: Number(row.accuracy_rate) || 0,
+      durationSeconds: Number(row.duration_seconds) || 0,
+      reactionTimeMs: row.metrics?.reaction_time_ms,
+      attempts: Number(row.metrics?.attempts) || 1,
+      completedAt: row.completed_at || row.created_at,
+      encouragingFeedback: getEncouragingMessage(
+        Number(row.accuracy_rate) || 0,
+        row.difficulty_level
+      ),
+      adaptiveReason: row.metrics?.adaptive_reason,
+    }));
+
+    return mapped;
+  } catch (err) {
+    console.error('Supabase network error fetching game history:', err);
+    return [];
+  }
 };
 
 export const getLocalSessions = (): GameResult[] => {

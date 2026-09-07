@@ -11,11 +11,11 @@ export interface AdaptiveThresholds {
 
 // Configurable adaptive parameters
 export const ADAPTIVE_CONFIG: AdaptiveThresholds = {
-  promotionAccuracy: 85,
-  promotionScore: 85,
+  promotionAccuracy: 80,
+  promotionScore: 70,
   demotionAccuracy: 60,
   demotionScore: 60,
-  minSessionsRequired: 3,
+  minSessionsRequired: 2,
   safeDefaultDifficulty: 'easy',
 };
 

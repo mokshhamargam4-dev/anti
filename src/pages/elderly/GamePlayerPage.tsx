@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -29,6 +30,9 @@ export const GamePlayerPage: React.FC = () => {
       setLoadingAdaptive(true);
       const history = await fetchUserGameHistory(user?.id);
       const decision = calculateAdaptiveDifficulty(activeGameId, history);
+      console.log('GAME:', activeGameId);
+console.log('HISTORY:', history);
+console.log('ADAPTIVE DECISION:', decision);
       
       setAdaptiveDecision(decision);
       setDifficulty(decision.difficulty);
@@ -49,8 +53,16 @@ export const GamePlayerPage: React.FC = () => {
     await saveGameSession(user?.id, enhancedResult);
   };
 
-  const handlePlayAgain = () => {
-    setCompletedResult(null);
+  const handlePlayAgain = async () => {
+    setLoadingAdaptive(true);
+
+  const history = await fetchUserGameHistory(user?.id);
+  const decision = calculateAdaptiveDifficulty(activeGameId, history);
+
+  setAdaptiveDecision(decision);
+  setDifficulty(decision.difficulty);
+  setCompletedResult(null);
+  setLoadingAdaptive(false);
   };
 
   const handlePlayNext = (nextId: CognitiveGameId) => {
@@ -147,3 +159,5 @@ export const GamePlayerPage: React.FC = () => {
     </div>
   );
 };
+      
+     
