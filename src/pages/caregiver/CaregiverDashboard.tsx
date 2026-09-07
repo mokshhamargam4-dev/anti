@@ -203,7 +203,7 @@ const handleAddCareTask = async () => {
   ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const result = await addDailyCarePlan(
-    selectedPatient.elderly.id,
+    selectedPatientId,
     user.id,
     taskTitle,
     taskDescription,
@@ -737,117 +737,7 @@ if (selectedPatient) {
           </div>
         </section>
       )}
-<div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
-  <div className="flex items-center space-x-2 mb-4">
-    <Calendar className="w-5 h-5 text-blue-700" />
-    <div>
-      <h3 className="text-lg font-bold text-slate-800">
-        Add Care Routine Task
-      </h3>
-      <p className="text-xs text-slate-500">
-        Add a task for {activePatientInfo?.elderly.preferred_name ||
-          activePatientInfo?.elderly.full_name ||
-          'the patient'}.
-      </p>
-    </div>
-  </div>
 
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <input
-      value={taskTitle}
-      onChange={(e) => setTaskTitle(e.target.value)}
-      placeholder="Task title"
-      className="w-full px-4 py-3 rounded-xl border border-slate-200"
-    />
-
-    <input
-      type="time"
-      value={taskTime}
-      onChange={(e) => setTaskTime(e.target.value)}
-      className="w-full px-4 py-3 rounded-xl border border-slate-200"
-    />
-
-    <textarea
-      value={taskDescription}
-      onChange={(e) => setTaskDescription(e.target.value)}
-      placeholder="Description (optional)"
-      className="w-full px-4 py-3 rounded-xl border border-slate-200 md:col-span-2"
-      rows={2}
-    />
-
-    <select
-      value={taskType}
-      onChange={(e) =>
-        setTaskType(
-          e.target.value as DailyPlan['activity_type']
-        )
-      }
-      className="w-full px-4 py-3 rounded-xl border border-slate-200"
-    >
-      <option value="routine">Routine</option>
-      <option value="cognitive_game">Cognitive Game</option>
-      <option value="walk">Walk</option>
-      <option value="meal">Meal</option>
-      <option value="family_call">Family Call</option>
-      <option value="cultural_music">Cultural Music</option>
-      <option value="medication">Medication</option>
-    </select>
-
-    <button
-      type="button"
-      disabled={taskSaving || !selectedPatientId}
-      onClick={async () => {
-        if (!selectedPatientId || !user?.id) return;
-
-        setTaskSaving(true);
-        setTaskMessage('');
-
-        const today = new Date();
-        const planDate =
-          `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        const result = await addDailyCarePlan(
-          selectedPatientId,
-          user.id,
-          taskTitle,
-          taskDescription,
-          planDate,
-          taskTime,
-          taskType
-        );
-
-        if (result.success) {
-          setTaskTitle('');
-          setTaskDescription('');
-          setTaskTime('');
-          setTaskType('routine');
-          setTaskMessage('Task added successfully.');
-
-          const current = linkedPatients.find(
-            (p) => p.elderly.id === selectedPatientId
-          );
-
-          if (current) {
-            await loadAnalytics(current.elderly);
-          }
-        } else {
-          setTaskMessage(result.error || 'Could not add task.');
-        }
-
-        setTaskSaving(false);
-      }}
-      className="px-5 py-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold disabled:opacity-50"
-    >
-      {taskSaving ? 'Adding...' : 'Add Task'}
-    </button>
-  </div>
-
-  {taskMessage && (
-    <p className="mt-3 text-sm font-semibold text-slate-600">
-      {taskMessage}
-    </p>
-  )}
-</div>
       {/* 8. Recent Game Performance Audit Table */}
       {analytics && (
         <section className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
