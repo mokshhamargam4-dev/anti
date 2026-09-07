@@ -37,6 +37,7 @@ export const CaregiverDashboard: React.FC = () => {
  
 
   const [linkedPatients, setLinkedPatients] = useState<LinkedPatientInfo[]>([]);
+  const[routineTasks,setRoutineTasks]=useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<PatientAnalyticsSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -697,12 +698,40 @@ if (selectedPatient) {
   )}
 </div>
           {/* Daily Care Routine Progress */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
+           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center space-x-2 text-slate-800 font-bold text-base mb-3">
                 <Calendar className="w-5 h-5 text-blue-700" />
                 <span>Today's Care Routine Tasks</span>
               </div>
+              <div className="grid grid-cols-3 gap-3 mb-5">
+  <div className="rounded-2xl bg-slate-50 p-3 text-center">
+    <div className="text-2xl font-bold text-slate-800">
+      {analytics.dailyPlans.length}
+    </div>
+    <div className="text-xs text-slate-500">
+      Assigned
+    </div>
+  </div>
+
+  <div className="rounded-2xl bg-emerald-50 p-3 text-center">
+    <div className="text-2xl font-bold text-emerald-700">
+      {analytics.dailyPlans.filter(plan => plan.is_completed).length}
+    </div>
+    <div className="text-xs text-emerald-700">
+      Completed
+    </div>
+  </div>
+
+  <div className="rounded-2xl bg-amber-50 p-3 text-center">
+    <div className="text-2xl font-bold text-amber-700">
+      {analytics.dailyPlans.filter(plan => !plan.is_completed).length}
+    </div>
+    <div className="text-xs text-amber-700">
+      Pending
+    </div>
+  </div>
+</div>
 
               <div className="divide-y divide-slate-100">
                 {analytics.dailyPlans.map(plan => (
