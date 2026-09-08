@@ -68,12 +68,203 @@ interface MemoryItem {
 }
 
 const [memories, setMemories] = useState<MemoryItem[]>([]);
+const [isListening, setIsListening] = useState(false);
+const [voiceLanguage, setVoiceLanguage] = useState<'en-IN' | 'hi-IN'>('en-IN');
   const [selectedMood, setSelectedMood] = useState<SimpleMood | null>(null);
   const [moodSubmitted, setMoodSubmitted] = useState<boolean>(false);
   const [dailyPlans, setDailyPlans] = useState<DailyPlan[]>([]);
+  const[recognizedCommand, setRecognizedCommand] = useState('');
   const [journey, setJourney] = useState<CognitiveJourneyStats | null>(null);
   const [personalizedPlan, setPersonalizedPlan] = useState<PersonalizedDailyPlan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  function startVoice() {
+  const SpeechRecognition =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert(
+      'Voice recognition is not supported. Please use Google Chrome or Microsoft Edge.'
+    );
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = voiceLanguage;
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  setIsListening(true);
+  setRecognizedCommand('');
+
+  recognition.onstart = () => {
+    console.log('🎙️ Voice recognition started');
+  };
+
+  recognition.onresult = (event: any) => {
+    const command =
+      event.results[0][0].transcript.toLowerCase().trim();
+
+    console.log('🎤 Heard:', command);
+    setRecognizedCommand(command);
+
+    const speak = (message: string) => {
+      const speech = new SpeechSynthesisUtterance(message);
+      speech.lang = voiceLanguage;
+
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(speech);
+    };
+
+    // ==========================================
+    // 1️⃣ MEMORY MATCH
+    // ==========================================
+    if (
+      command.includes('memory match') ||
+      command.includes('match game') ||
+      command.includes('matching game') ||
+      command.includes('मेमोरी मैच')
+    ) {
+      speak(
+        voiceLanguage === 'hi-IN'
+          ? 'मेमोरी मैच शुरू किया जा रहा है।'
+          : 'Starting Memory Match.'
+      );
+
+      setTimeout(() => {
+        navigate('/elderly/play/memory-match');
+      }, 700);
+
+      return;
+    }
+
+    // ==========================================
+    // 2️⃣ REMEMBER THE OBJECTS
+    // ==========================================
+    if (
+      command.includes('remember the objects') ||
+      command.includes('remember objects') ||
+      command.includes('objects game') ||
+      command.includes('object game') ||
+      command.includes('वस्तु') ||
+      command.includes('चीजें')
+    ) {
+      speak(
+        voiceLanguage === 'hi-IN'
+          ? 'याद रखने वाली वस्तुओं का खेल शुरू किया जा रहा है।'
+          : 'Starting Remember the Objects.'
+      );
+
+      setTimeout(() => {
+        navigate('/elderly/play/remember-objects');
+      }, 700);
+
+      return;
+    }
+
+    // ==========================================
+    // 3️⃣ SEQUENCE MEMORY
+    // ==========================================
+    if (
+      command.includes('sequence memory') ||
+      command.includes('sequence game') ||
+      command.includes('memory sequence') ||
+      command.includes('sequence') ||
+      command.includes('अनुक्रम')
+    ) {
+      speak(
+        voiceLanguage === 'hi-IN'
+          ? 'सीक्वेंस मेमोरी शुरू किया जा रहा है।'
+          : 'Starting Sequence Memory.'
+      );
+
+      setTimeout(() => {
+        navigate('/elderly/play/sequence-memory');
+      }, 700);
+
+      return;
+    }
+
+    // ==========================================
+    // 4️⃣ SMRITI PRACTICE
+    // ==========================================
+    if (
+      command.includes('smriti') ||
+      command.includes('smriti practice') ||
+      command.includes('memory practice') ||
+      command.includes('practice') ||
+      command.includes('स्मृति') ||
+      command.includes('अभ्यास')
+    ) {
+      speak(
+        voiceLanguage === 'hi-IN'
+          ? 'स्मृति अभ्यास शुरू किया जा रहा है।'
+          : 'Starting Smriti Practice.'
+      );
+
+      setTimeout(() => {
+        navigate('/elderly/smriti-practice');
+      }, 700);
+
+      return;
+    }
+
+    // ==========================================
+    // 5️⃣ TODAY'S ROUTINE
+    // ==========================================
+    if (
+      command.includes('routine') ||
+      command.includes('my routine') ||
+      command.includes('today routine') ||
+      command.includes('daily routine') ||
+      command.includes('schedule') ||
+      command.includes('my tasks') ||
+      command.includes('daily tasks') ||
+      command.includes('दिनचर्या') ||
+      command.includes('आज')
+    ) {
+      speak(
+        voiceLanguage === 'hi-IN'
+          ? 'यह आपकी आज की दिनचर्या है।'
+          : 'Showing your routine for today.'
+      );
+
+      setTimeout(() => {
+        document
+          .getElementById('daily-routine')
+          ?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+      }, 500);
+
+      return;
+    }
+
+    // ==========================================
+    // UNKNOWN COMMAND
+    // ==========================================
+    speak(
+      voiceLanguage === 'hi-IN'
+        ? 'माफ कीजिए। आप मेमोरी मैच, ऑब्जेक्ट्स, सीक्वेंस, स्मृति अभ्यास या दिनचर्या कह सकते हैं।'
+        : 'Sorry, I did not understand. You can say Memory Match, Remember the Objects, Sequence Memory, Smriti Practice, or Routine.'
+    );
+  };
+
+  recognition.onerror = (event: any) => {
+    console.error('🎙️ Voice error:', event.error);
+    setIsListening(false);
+  };
+
+  recognition.onend = () => {
+    console.log('🎙️ Voice recognition ended');
+    setIsListening(false);
+  };
+
+  recognition.start();
+}
   if (!user?.id) {
   setLoading(false);
   return;
@@ -103,6 +294,7 @@ if (!memoryError) {
 }
       const computedJourney = calculateCognitiveJourney(sessions);
       setJourney(computedJourney);
+      
 
       // 2. Fetch stored or initial mood
       const storedMoodRecord = getStoredMood();
@@ -229,7 +421,30 @@ const displayName = profile?.preferred_name || profile?.full_name || 'Friend';
   const dateString = currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+      
+  <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    {/* VOICE ASSISTANT */}
+    <div className="flex flex-wrap items-center gap-3">
+      <select
+        value={voiceLanguage}
+        onChange={(e) =>
+          setVoiceLanguage(e.target.value as 'en-IN' | 'hi-IN')
+        }
+        className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+      >
+        <option value="en-IN">English</option>
+        <option value="hi-IN">हिंदी</option>
+      </select>
+
+      <button
+        onClick={startVoice}
+        className="rounded-2xl bg-indigo-600 px-5 py-3 text-white font-bold shadow-md"
+      >
+        🎙️ {isListening ? 'Listening...' : 'Talk to SmritiSetu'}
+      </button>
+    </div>
       
       {/* 1. Warm Greeting & Time Orientation Banner */}
       <section className="bg-gradient-to-r from-teal-800 to-emerald-700 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden">
@@ -734,7 +949,7 @@ const displayName = profile?.preferred_name || profile?.full_name || 'Friend';
       )}
 
       {/* 5. TODAY'S GENTLE CARE ROUTINE */}
-      <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-md">
+      <section id="daily-routine" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-md">
         <div className="flex items-center space-x-3 mb-6">
           <div className="p-3 bg-blue-50 rounded-2xl text-blue-700">
             <CalendarCheck className="w-7 h-7" />
